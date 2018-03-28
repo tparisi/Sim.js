@@ -113,15 +113,11 @@ Sim.App.prototype.init = function(param)
     var root = new THREE.Object3D();
     scene.add(root);
     
-    // Create a projector to handle picking
-    var projector = new THREE.Projector();
-    
     // Save away a few things
     this.container = container;
     this.renderer = renderer;
     this.scene = scene;
     this.camera = camera;
-    this.projector = projector;
     this.root = root;
     
     // Set up event handlers
@@ -188,12 +184,8 @@ Sim.App.prototype.initMouse = function()
 			function(e) { that.onDocumentMouseDown(e); }, false );
 	dom.addEventListener( 'mouseup', 
 			function(e) { that.onDocumentMouseUp(e); }, false );
-	
-	$(dom).mousewheel(
-	        function(e, delta) {
-	            that.onDocumentMouseScroll(e, delta);
-	        }
-	    );
+
+	dom.addEventListener('wheel', function(e){that.onDocumentMouseScroll(e)}, false);
 	
 	this.overObject = null;
 	this.clickedObject = null;
@@ -327,12 +319,14 @@ Sim.App.prototype.onDocumentMouseUp = function(event)
     this.clickedObject = null;
 }
 
-Sim.App.prototype.onDocumentMouseScroll = function(event, delta)
+Sim.App.prototype.onDocumentMouseScroll = function(event)
 {
     event.preventDefault();
 
     if (this.handleMouseScroll)
     {
+		var e = window.event || e;
+        var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
     	this.handleMouseScroll(delta);
     }
 }
@@ -340,21 +334,25 @@ Sim.App.prototype.onDocumentMouseScroll = function(event, delta)
 Sim.App.prototype.objectFromMouse = function(pagex, pagey)
 {
 	// Translate page coords to element coords
-	var offset = $(this.renderer.domElement).offset();	
-	var eltx = pagex - offset.left;
-	var elty = pagey - offset.top;
+	var offsetLeft = this.renderer.domElement.offsetLeft;
+	var offsetTop = this.renderer.domElement.offsetTop;
+	var eltx = pagex - offsetLeft;
+	var elty = pagey - offsetTop;
 	
 	// Translate client coords into viewport x,y
     var vpx = ( eltx / this.container.offsetWidth ) * 2 - 1;
-    var vpy = - ( elty / this.container.offsetHeight ) * 2 + 1;
-    
-    var vector = new THREE.Vector3( vpx, vpy, 0.5 );
-
-    this.projector.unprojectVector( vector, this.camera );
+	var vpy = - ( elty / this.container.offsetHeight ) * 2 + 1;
 	
-    var ray = new THREE.Ray( this.camera.position, vector.subSelf( this.camera.position ).normalize() );
-
-    var intersects = ray.intersectScene( this.scene );
+	var raycaster = new THREE.Raycaster();
+	var mouse = new THREE.Vector2();
+	
+	mouse.x = vpx; 
+	mouse.y = vpy;
+	
+	raycaster.setFromCamera(mouse, this.camera);
+	
+	var intersects = raycaster.intersectObjects( this.scene.children );
+    
 	
     if ( intersects.length > 0 ) {    	
     	
